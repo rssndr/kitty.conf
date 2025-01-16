@@ -8,7 +8,7 @@
 #include <termios.h>
 
 const int width = 80;
-const int height = 40;
+const int height = 42;
 const float theta_spacing = 0.07;
 const float phi_spacing = 0.02;
 const float R1 = 0.8;
@@ -50,14 +50,27 @@ void normalize(float* x, float* y, float* z) {
     *z /= length;
 }
 
-void render_frames(float A, float B) {
+void render_frames(float A, float B, const char* date_str) {
     // Output buffer for the frame
     char output[width * height];
     memset(output, ' ', width * height);
+    
     // Z buffer used to handle depth
     float z_buffer[width * height];
     for (int i = 0; i < width * height; i++) {
         z_buffer[i] = -1e9;
+    }
+
+    // First, put the welcome message into the output buffer
+    const char welcome[] = "Welcome!";
+    for (int i = 0; i < strlen(welcome); i++) {
+        output[i] = welcome[i];
+    }
+    
+    // Add newlines and the date string
+    int date_offset = 2 * width;  // Move down 2 lines
+    for (int i = 0; i < strlen(date_str); i++) {
+        output[date_offset + i] = date_str[i];
     }
 
     // Light source direction
@@ -85,7 +98,7 @@ void render_frames(float A, float B) {
             
             // Convert to integer screen coordinates
             int sx = (int)screen_x;
-            int sy = (int)screen_y;
+            int sy = (int)screen_y + 4;  // Offset for welcome message space
 
             // Calculate surface normal in world coordinates
             float nx = cos(phi) * cos(theta);
@@ -115,13 +128,19 @@ void render_frames(float A, float B) {
         }
     }
 
-    // Clear the console and reset cursor position
+    // Move cursor to home position and print the entire frame at once
     printf("\x1B[H");
-
-    // Print the frame to the console
+    
+    // Print the entire buffer with appropriate color codes
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
-            printf("%c", output[i * width + j]);
+            int idx = i * width + j;
+            // If we're in the welcome message area (first 6 lines)
+            if (i < 4) {
+                printf("\033[97m%c\033[0m", output[idx]);
+            } else {
+                printf("%c", output[idx]);
+            }
         }
         printf("\n");
     }
@@ -134,53 +153,52 @@ int main() {
 
     // Hide the cursor
     printf("\x1B[?25l");
+    fflush(stdout);
     
     // Get current time
     time_t t = time(NULL);
     struct tm *tm = localtime(&t);
     char date_str[64];
     strftime(date_str, sizeof(date_str), "%A, %B %d, %Y | %H:%M", tm);
-    
-    // Print welcome message in green
-    printf("\033[32mWelcome!\n\n%s\033[0m\n\n", date_str);
-    
-    // Move cursor down a bit to create space between message and torus
-    printf("\n\n");
 
     float A = 0;
     float B = 0;
 
-    // Add a flag to control the animation loop
-    int running = 1;
-    struct termios old_tio, new_tio;
-    
     // Set up non-blocking input
+    struct termios old_tio, new_tio;
+    unsigned char c;
+    
     tcgetattr(STDIN_FILENO, &old_tio);
     new_tio = old_tio;
     new_tio.c_lflag &= (~ICANON & ~ECHO);
+    new_tio.c_cc[VMIN] = 0;
+    new_tio.c_cc[VTIME] = 0;
     tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
 
-    while (running) {
-        // Check for keypress
-        if (read(STDIN_FILENO, &running, 1) > 0) {
-            running = 0;
-        }
-
-        printf("\x1B[%d;0H", 6);  // Move to line 6 (after welcome message)
-        render_frames(A, B);
+    // Animation loop
+    while (1) {
+        // Render everything in one go
+        render_frames(A, B, date_str);
+        fflush(stdout);
+        
         A += 0.04;
         B += 0.02;
-        usleep(30000);  // 30ms
+        
+        // Non-blocking check for keypress
+        if (read(STDIN_FILENO, &c, 1) > 0) {
+            break;
+        }
+        
+        usleep(30000);  // 30ms delay
     }
 
     // Restore terminal settings
     tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
     
-    // Show cursor before exit
+    // Show cursor and clear screen
     printf("\x1B[?25h");
-    
-    // Clear screen and reset cursor position
     printf("\x1B[2J\x1B[H");
+    fflush(stdout);
 
     return 0;
 }
