@@ -1,6 +1,8 @@
 # kitty.conf
 
-Personal kitty terminal config based on GNOME terminal palette colors
+Personal kitty terminal configuration featuring:
+- Color palette inspired by GNOME terminal
+- Unique startup animation: a rotating, color-shifting ASCII torus
 
 ## Setup
 
