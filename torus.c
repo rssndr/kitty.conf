@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <time.h>
+#include <termios.h>
 
 const int width = 80;
 const int height = 40;
@@ -114,7 +116,6 @@ void render_frames(float A, float B) {
     }
 
     // Clear the console and reset cursor position
-    system("clear");
     printf("\x1B[H");
 
     // Print the frame to the console
@@ -133,16 +134,53 @@ int main() {
 
     // Hide the cursor
     printf("\x1B[?25l");
+    
+    // Get current time
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    char date_str[64];
+    strftime(date_str, sizeof(date_str), "%A, %B %d, %Y | %H:%M", tm);
+    
+    // Print welcome message in green
+    printf("\033[32mWelcome!\n\n%s\033[0m\n\n", date_str);
+    
+    // Move cursor down a bit to create space between message and torus
+    printf("\n\n");
 
     float A = 0;
     float B = 0;
 
-    while (1) {
+    // Add a flag to control the animation loop
+    int running = 1;
+    struct termios old_tio, new_tio;
+    
+    // Set up non-blocking input
+    tcgetattr(STDIN_FILENO, &old_tio);
+    new_tio = old_tio;
+    new_tio.c_lflag &= (~ICANON & ~ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
+
+    while (running) {
+        // Check for keypress
+        if (read(STDIN_FILENO, &running, 1) > 0) {
+            running = 0;
+        }
+
+        printf("\x1B[%d;0H", 6);  // Move to line 6 (after welcome message)
         render_frames(A, B);
         A += 0.04;
         B += 0.02;
         usleep(30000);  // 30ms
     }
+
+    // Restore terminal settings
+    tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
+    
+    // Show cursor before exit
+    printf("\x1B[?25h");
+    
+    // Clear screen and reset cursor position
+    printf("\x1B[2J\x1B[H");
 
     return 0;
 }
