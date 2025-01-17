@@ -9,13 +9,12 @@ Personal kitty terminal configuration featuring:
 1. Clone the repository:
 ```bash
 git clone https://github.com/a-rossetti/kitty.conf ~/.config/kitty
+cd ~/.config/kitty
 ```
 
 2. Compile the welcome animation:
 ```bash
-cd ~/.config/kitty
 gcc welcome.c -o welcome -lm
-chmod +x welcome
 ```
 
 3. Add this to your `~/.bashrc`:
